@@ -14,11 +14,29 @@ workflows:
           silta_config: silta/silta.yml
           filters:
             branches:
+              only:
+                - master
+
+      - approval:
+          type: approval
+          name: "Deployment approval"
+          filters:
+            branches:
               ignore:
                 - production
+                - master
 
       - silta/simple-build-deploy:
-          # Extend the build-deploy configuration
+          <<: *build-deploy
+          requires:
+            - "Deployment approval"
+          filters:
+            branches:
+              ignore:
+                - production
+                - master
+
+      - silta/simple-build-deploy:
           <<: *build-deploy
           name: Silta build & deploy to production cluster
           silta_config: silta/silta.yml,silta/silta-prod.yml
