@@ -3,12 +3,19 @@ version: 2.1
 orbs:
   silta: silta/silta@1
 
+executors:
+  node22:
+    docker:
+      - image: wunderio/silta-cicd:circleci-php8.2-node22-composer2-test20240613
+
+
 workflows:
   version: 2
   build_deploy:
     jobs:
       - silta/simple-build-deploy: &build-deploy
           name: 'Silta build & deploy'
+          executor: node22
           build_folder: web
           context: 'silta_dev'
           silta_config: silta/silta.yml
@@ -43,5 +50,5 @@ workflows:
           context: silta_finland
           filters:
             branches:
-              only: 
+              only:
                 - production
