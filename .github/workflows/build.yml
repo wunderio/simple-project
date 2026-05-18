@@ -95,6 +95,7 @@ jobs:
         with:
           context: .
           file: silta/nginx.Dockerfile
+          pull: true
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.REPO }}/nginx:${{ steps.tag.outputs.tag }}
           labels: |
