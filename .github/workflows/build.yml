@@ -1,0 +1,105 @@
+---
+name: Build & Push Images
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "k8s/**"
+      - "**.md"
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ${{ vars.REGISTRY || 'registry.wdr.io' }}
+  REPO: ${{ github.event.repository.name }}
+
+jobs:
+  # ---------------------------------------------------------------
+  # Stage 1: Validate codebase.
+  # Simple project has no application code to lint — just verify
+  # the Dockerfile and static content are well-formed.
+  # ---------------------------------------------------------------
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: silta/nginx.Dockerfile
+          failure-threshold: error
+
+  # ---------------------------------------------------------------
+  # Stage 2: Build and push Docker image.
+  # ---------------------------------------------------------------
+  build-image:
+    name: Build & Push — nginx
+    runs-on: ubuntu-latest
+    needs: validate
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: tag
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          SAFE=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | cut -c1-40)
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%S)
+          echo "tag=${SAFE}-${TIMESTAMP}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "branch=${SAFE}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Harbor registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Ensure Harbor project exists
+        shell: bash
+        run: |
+          BODY=$(curl -s \
+            -u '${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}' \
+            "https://${REGISTRY}/api/v2.0/projects?name=${REPO}")
+          if echo "$BODY" | grep -q '"project_id"'; then
+            echo "Project '${REPO}' already exists."
+          else
+            echo "Creating project '${REPO}'..."
+            curl -s -f -X POST \
+              -u '${{ secrets.REGISTRY_USERNAME }}:${{ secrets.REGISTRY_PASSWORD }}' \
+              -H "Content-Type: application/json" \
+              "https://${REGISTRY}/api/v2.0/projects" \
+              -d "{\"project_name\":\"${REPO}\",\"public\":false}" \
+              && echo "Project created." \
+              || echo "::warning::Failed to create project (may already exist or lack permissions)."
+          fi
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: silta/nginx.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.REPO }}/nginx:${{ steps.tag.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.branch=${{ steps.tag.outputs.branch }}
+          cache-from: type=gha,scope=nginx
+          cache-to: type=gha,scope=nginx,mode=max
