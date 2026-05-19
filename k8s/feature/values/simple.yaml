@@ -1,0 +1,9 @@
+---
+# Helm values for the simple chart — feature/PR environments.
+#
+# UPDATE: Change image repository paths to match your Harbor project name.
+
+nginx:
+  image:
+    repository: registry.wdr.io/CHANGEME/nginx
+    tag: placeholder-00000000T000000-0000000

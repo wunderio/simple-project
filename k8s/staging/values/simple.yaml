@@ -1,0 +1,14 @@
+---
+# Helm values for the simple chart — staging environment.
+#
+# Image tags are updated by CI via wunderio/silta-actions/update-image-tags.
+# Tag format: {branch-normalized}-{timestamp}-{sha}
+# Example:    main-20260101T120000-abc1234
+#
+# UPDATE: Change image repository paths to match your Harbor project name.
+
+nginx:
+  image:
+    # UPDATE: Replace CHANGEME with your Harbor project name.
+    repository: registry.wdr.io/CHANGEME/nginx
+    tag: main-00000000T000000-0000000
