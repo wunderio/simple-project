@@ -1,0 +1,12 @@
+---
+# Values of the simple chart for the feature overlay. Platform and cluster defaults (domain,
+# TLS, storage) come from wunderio/argocd-cluster-management and apply before this file.
+# Chart options: https://github.com/wunderio/charts/blob/master/simple/values.yaml
+#
+# CI (.github/workflows/build.yml, update-image-tags) sets the image tags after each
+# build; the placeholder tags below are replaced on the branch's first build.
+
+nginx:
+  image:
+    repository: registry.wdr.io/PROJECT_NAME/nginx
+    tag: feature-00000000T000000-0000000
